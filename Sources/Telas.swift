@@ -337,16 +337,24 @@ final class Splitter: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { labels.forEach { $0.orderOut(nil) } }
     }
 
-    /// Physical displays back where they were; virtual ones parked to the right of the rightmost display.
+    /// Physical displays back where they were. Virtual ones are parked to the right as a translated
+    /// copy of the physical layout (a portrait monitor's halves stacked, a landscape one's side by
+    /// side), so dragging windows between halves follows what you see.
     private func restoreArrangement(_ origins: [CGDirectDisplayID: CGPoint]) {
         var cfg: CGDisplayConfigRef?
         guard CGBeginDisplayConfiguration(&cfg) == .success else { return }
         for (id, o) in origins { CGConfigureDisplayOrigin(cfg, id, Int32(o.x), Int32(o.y)) }
-        var x = origins.keys.map { CGDisplayBounds($0).maxX }.max() ?? 0
-        let y = CGDisplayBounds(CGMainDisplayID()).minY
-        for h in halves {
-            CGConfigureDisplayOrigin(cfg, h.virtualID, Int32(x), Int32(y))
-            x += h.pixelSize.width
+        // Where each half sits on the restored physical layout
+        let rects = halves.map { h -> CGRect in
+            let size = CGDisplayBounds(h.physicalID).size
+            let o = origins[h.physicalID] ?? CGDisplayBounds(h.physicalID).origin
+            return CGRect(x: o.x + h.fraction.minX * size.width, y: o.y + h.fraction.minY * size.height,
+                          width: h.pixelSize.width, height: h.pixelSize.height)
+        }
+        let rightEdge = origins.map { CGRect(origin: $0.value, size: CGDisplayBounds($0.key).size).maxX }.max() ?? 0
+        let dx = rightEdge - (rects.map(\.minX).min() ?? 0)
+        for (h, r) in zip(halves, rects) {
+            CGConfigureDisplayOrigin(cfg, h.virtualID, Int32(r.minX + dx), Int32(r.minY))
         }
         CGCompleteDisplayConfiguration(cfg, .forSession)
     }
