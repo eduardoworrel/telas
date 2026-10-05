@@ -2,6 +2,8 @@
 
 **Split an ultrawide (or any external) monitor into two independent screens on macOS.**
 
+![Telas splitting an ultrawide into two halves and a portrait monitor into top and bottom](docs/demo.gif)
+
 Each half behaves like a real display: its own menu bar, its own full-screen space, its own Mission Control.
 Landscape monitors are split left/right, portrait monitors top/bottom.
 
