@@ -3,6 +3,8 @@
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface CGVirtualDisplayDescriptor : NSObject
 @property(retain, nonatomic) dispatch_queue_t queue;
 @property(retain, nonatomic) NSString *name;
@@ -30,3 +32,5 @@
 - (BOOL)applySettings:(CGVirtualDisplaySettings *)settings NS_SWIFT_NAME(applySettings(_:));
 @property(readonly, nonatomic) unsigned int displayID;
 @end
+
+NS_ASSUME_NONNULL_END
