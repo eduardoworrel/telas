@@ -553,7 +553,7 @@ enum Permissions {
     static var screenRecording: Bool { CGPreflightScreenCaptureAccess() }
     static var allGranted: Bool { accessibility && screenRecording }
 
-    /// Official prompts: they also add Telas to the list in System Settings.
+    /// Official prompts: they register Telas in the list in System Settings.
     static func requestAccessibility() {
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(opts)
@@ -563,6 +563,7 @@ enum Permissions {
         _ = CGRequestScreenCaptureAccess()
         openSettings("Privacy_ScreenCapture")
     }
+
     private static func openSettings(_ pane: String) {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
     }
@@ -608,12 +609,16 @@ struct OnboardingView: View {
                    "Se o Telas não aparecer na lista, arraste o Telas.app para ela ou use o botão +."))
                 .font(.footnote).foregroundStyle(.secondary)
             HStack {
-                Spacer()
                 if accessibility && screenRecording {
+                    Spacer()
                     Button(L("Done", "Pronto")) { Onboarding.close() }.keyboardShortcut(.defaultAction)
-                } else if accessibility || screenRecording {
-                    // Screen Recording only takes effect after a restart of the app
-                    Button(L("Reopen Telas", "Reabrir o Telas")) { relaunch() }
+                } else {
+                    // macOS only confirms the permissions to Telas after it restarts
+                    Text(L("Enabled them in System Settings? Reopen Telas to apply.",
+                           "Ativou nos Ajustes? Reabra o Telas para aplicar."))
+                        .font(.callout)
+                    Spacer()
+                    Button(L("Reopen Telas", "Reabrir o Telas")) { relaunch() }.keyboardShortcut(.defaultAction)
                 }
             }
         }

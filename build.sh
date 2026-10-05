@@ -22,16 +22,15 @@ PLIST
 
 swiftc -O -parse-as-library -import-objc-header Sources/VirtualDisplay.h Sources/Telas.swift -o $APP/Contents/MacOS/Telas
 
-# Ad-hoc signature with a requirement pinned to the bundle identifier, so the
-# Screen Recording and Accessibility permissions survive rebuilds.
-codesign -s - --force -r='designated => identifier "io.github.eduardoworrel.telas"' $APP
+# Plain ad-hoc signature: macOS lists the app in Privacy & Security on its own when it asks for
+# permissions. (A rebuilt binary is a "new" app to macOS, so permissions must be granted again.)
+codesign -s - --force $APP
 echo "Built $APP"
 
 if [[ "$1" == "--install" ]]; then
   pkill -f Telas.app/Contents/MacOS || true
-  rm -rf ~/Applications/Telas.app
-  mkdir -p ~/Applications
-  cp -R $APP ~/Applications/
-  open ~/Applications/Telas.app
-  echo "Installed ~/Applications/Telas.app"
+  rm -rf /Applications/Telas.app
+  cp -R $APP /Applications/
+  open /Applications/Telas.app
+  echo "Installed /Applications/Telas.app"
 fi

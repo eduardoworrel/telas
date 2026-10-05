@@ -35,9 +35,12 @@ cd telas
 ./build.sh --install
 ```
 
-The app lives in the menu bar (▭▭ icon). On first launch a window walks you through the two
-permissions: click **Allow** on each one, enable Telas in System Settings, then click **Reopen Telas**
-(macOS only applies Screen Recording after a restart). You can reopen it any time from the menu → *Permissions…*.
+`--install` copies the app to `/Applications` and opens it. It lives in the menu bar (▭▭ icon).
+On first launch a window walks you through the two permissions: click **Allow** on each one, enable
+Telas in System Settings (if it is not listed, use **+** and pick Telas in Applications), then click
+**Reopen Telas** (macOS only confirms the permissions after a restart).
+
+> Rebuilding produces a new ad-hoc signature, so macOS asks for the permissions again after each build. You can reopen it any time from the menu → *Permissions…*.
 
 ## Usage
 
