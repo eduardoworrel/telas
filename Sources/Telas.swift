@@ -456,6 +456,18 @@ final class MouseRouter {
     private func route(_ event: CGEvent) {
         let p = event.location
         let d = CGPoint(x: event.getDoubleValueField(.mouseEventDeltaX), y: event.getDoubleValueField(.mouseEventDeltaY))
+        // Back door: the real cursor reached a virtual display that is not where the visible cursor is
+        // (e.g. pushed past the built-in display's edge into the parked displays during a skipped
+        // event). Put it back where the user sees it.
+        if let h = halves.first(where: { $0.virtualBounds.contains(p) }),
+           !h.physical.insetBy(dx: -2, dy: -2).contains(logical) {
+            let t = target(for: logical)
+            event.location = t
+            warp(t)
+            skip = 1
+            drawCursor(t)
+            return
+        }
         if skip > 0 { skip -= 1; drawCursor(p); return }
 
         let next = CGPoint(x: p.x + d.x, y: p.y + d.y)
