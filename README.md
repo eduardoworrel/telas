@@ -35,8 +35,9 @@ cd telas
 ./build.sh --install
 ```
 
-The app lives in the menu bar (▭▭ icon). The first time you split, macOS asks for the two permissions.
-After granting Screen Recording, quit Telas from its menu and open it again.
+The app lives in the menu bar (▭▭ icon). On first launch a window walks you through the two
+permissions: click **Allow** on each one, enable Telas in System Settings, then click **Reopen Telas**
+(macOS only applies Screen Recording after a restart). You can reopen it any time from the menu → *Permissions…*.
 
 ## Usage
 
@@ -76,7 +77,8 @@ sobre a metade física (via ScreenCaptureKit) e guia o mouse para que o moviment
 As janelas que estavam no monitor vão para as metades ao dividir e voltam ao juntar.
 
 **Instalar:** `git clone https://github.com/eduardoworrel/telas.git && cd telas && ./build.sh --install`.
-Requer macOS 14+, Command Line Tools e as permissões de **Gravação de Tela** e **Acessibilidade**.
+Requer macOS 14+ e Command Line Tools. Na primeira vez, uma janela guia a liberação de **Acessibilidade** e
+**Gravação de Tela** (clique em **Permitir**, ative o Telas nos Ajustes e depois em **Reabrir o Telas**).
 
 **Emergência:** **⌃⌥⌘J** desfaz tudo, mesmo que o mouse se perca.
 

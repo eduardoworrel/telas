@@ -14,6 +14,10 @@ func L(_ en: String, _ pt: String) -> String { isPortuguese ? pt : en }
 struct TelasApp: App {
     @StateObject private var split = Splitter()
 
+    init() {
+        DispatchQueue.main.async { if !Permissions.allGranted { Onboarding.show() } }
+    }
+
     var body: some Scene {
         MenuBarExtra {
             Text(split.status)
@@ -30,6 +34,7 @@ struct TelasApp: App {
                 .disabled(split.busy || (!split.active && split.selected.isEmpty))
             Button(L("Identify screens", "Identificar telas")) { split.identify() }
                 .disabled(!split.active)
+            Button(L("Permissions…", "Permissões…")) { Onboarding.show() }
             Divider()
             Button(L("Quit", "Sair")) { split.stop(); NSApp.terminate(nil) }
         } label: {
@@ -230,18 +235,7 @@ final class Splitter: ObservableObject {
 
     func start() {
         error = nil
-        guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else {
-            error = L("Screen Recording permission missing: allow Telas in System Settings > Privacy & Security, then quit and reopen the app",
-                      "Sem permissao de Gravacao de Tela: libere o Telas em Ajustes > Privacidade e Seguranca, saia e abra o app de novo")
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
-            return
-        }
-        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        guard AXIsProcessTrustedWithOptions(opts) else {
-            error = L("Accessibility permission missing: allow Telas in System Settings > Privacy & Security",
-                      "Sem permissao de Acessibilidade: libere o Telas em Ajustes > Privacidade e Seguranca")
-            return
-        }
+        guard Permissions.allGranted else { Onboarding.show(); return }
         // Original position of the physical displays: macOS pushes them around when virtual ones appear
         originalOrigins = Dictionary(uniqueKeysWithValues: Self.physicalDisplays().map { ($0, CGDisplayBounds($0).origin) })
         active = true
@@ -550,6 +544,107 @@ enum WindowMover {
         var v: CFTypeRef?
         AXUIElementCopyAttributeValue(w, "AXFullScreen" as CFString, &v)
         return (v as? Bool) ?? false
+    }
+}
+
+/// The two permissions Telas needs.
+enum Permissions {
+    static var accessibility: Bool { AXIsProcessTrusted() }
+    static var screenRecording: Bool { CGPreflightScreenCaptureAccess() }
+    static var allGranted: Bool { accessibility && screenRecording }
+
+    /// Official prompts: they also add Telas to the list in System Settings.
+    static func requestAccessibility() {
+        let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(opts)
+        openSettings("Privacy_Accessibility")
+    }
+    static func requestScreenRecording() {
+        _ = CGRequestScreenCaptureAccess()
+        openSettings("Privacy_ScreenCapture")
+    }
+    private static func openSettings(_ pane: String) {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)")!)
+    }
+}
+
+/// Window that walks the user through granting the permissions (shown on launch when something is missing).
+@MainActor
+enum Onboarding {
+    private static var window: NSWindow?
+
+    static func show() {
+        if window == nil {
+            let w = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 460, height: 300),
+                             styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            w.title = "Telas"
+            w.contentView = NSHostingView(rootView: OnboardingView())
+            w.isReleasedWhenClosed = false
+            w.center()
+            window = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+    }
+
+    static func close() { window?.close() }
+}
+
+struct OnboardingView: View {
+    @State private var accessibility = Permissions.accessibility
+    @State private var screenRecording = Permissions.screenRecording
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(L("Telas needs two permissions", "O Telas precisa de duas permissões")).font(.title2.bold())
+            row(L("Accessibility", "Acessibilidade"),
+                L("Routes the mouse between halves and moves windows.", "Guia o mouse entre as metades e move as janelas."),
+                granted: accessibility, action: Permissions.requestAccessibility)
+            row(L("Screen Recording", "Gravação de Tela"),
+                L("Shows each virtual display over its half. Nothing leaves your Mac.", "Mostra cada monitor virtual sobre a sua metade. Nada sai do seu Mac."),
+                granted: screenRecording, action: Permissions.requestScreenRecording)
+            Text(L("If Telas is not in the list, drag Telas.app into it or use the + button.",
+                   "Se o Telas não aparecer na lista, arraste o Telas.app para ela ou use o botão +."))
+                .font(.footnote).foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                if accessibility && screenRecording {
+                    Button(L("Done", "Pronto")) { Onboarding.close() }.keyboardShortcut(.defaultAction)
+                } else if accessibility || screenRecording {
+                    // Screen Recording only takes effect after a restart of the app
+                    Button(L("Reopen Telas", "Reabrir o Telas")) { relaunch() }
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 460)
+        .onReceive(timer) { _ in
+            accessibility = Permissions.accessibility
+            screenRecording = Permissions.screenRecording
+        }
+    }
+
+    private func row(_ title: String, _ detail: String, granted: Bool, action: @escaping () -> Void) -> some View {
+        HStack(alignment: .top) {
+            Image(systemName: granted ? "checkmark.circle.fill" : "circle")
+                .foregroundStyle(granted ? .green : .secondary).font(.title2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline)
+                Text(detail).font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if !granted { Button(L("Allow", "Permitir"), action: action) }
+        }
+    }
+
+    private func relaunch() {
+        let path = Bundle.main.bundlePath
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "sleep 1; open \"\(path)\""]
+        try? p.run()
+        NSApp.terminate(nil)
     }
 }
 
