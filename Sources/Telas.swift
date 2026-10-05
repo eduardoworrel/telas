@@ -221,6 +221,7 @@ final class Splitter: ObservableObject {
     private var halves: [Half] = []
     private var router: MouseRouter?
     private var screenObserver: NSObjectProtocol?
+    private var windowSweeper: Timer?
     private var originalOrigins: [CGDirectDisplayID: CGPoint] = [:]
     private var nextName = 1
 
@@ -242,6 +243,14 @@ final class Splitter: ObservableObject {
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.halves.forEach { $0.placeWindow() } }
+        }
+        // Windows opened later (dialogs, new app windows) can land on the covered physical display,
+        // hidden under the halves: move them into the matching half.
+        windowSweeper = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, !self.busy, !self.halves.isEmpty else { return }
+                WindowMover.move(self.halves.map { ($0.physical, $0.virtualBounds) })
+            }
         }
         let ids = Self.physicalDisplays().filter { CGDisplayIsBuiltin($0) == 0 && selected.contains($0) }
         run { try await self.add(ids) }
@@ -354,6 +363,8 @@ final class Splitter: ObservableObject {
     }
 
     func stop() {
+        windowSweeper?.invalidate()
+        windowSweeper = nil
         router?.stop()
         router = nil
         if !halves.isEmpty { WindowMover.move(halves.map { ($0.virtualBounds, $0.physical) }) }   // halves -> physical
